@@ -429,3 +429,4 @@ __marimo__/
 
 # PyPI config
 .pypirc
+.claude.local.md
