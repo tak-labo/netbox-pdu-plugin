@@ -1,0 +1,91 @@
+# See PEP 518 for the spec of this file
+# https://www.python.org/dev/peps/pep-0518/
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name =  "netbox-pdu-plugin"
+version = "0.1.0"
+authors = [
+    {name = "Takahiro Nagafuchi", email = "github@tak-lab.com"},
+]
+description = "NetBox plugin for Managed PDUs."
+readme = "README.md"
+license-files = ["LICENSE"]
+keywords = ["netbox", "netbox-plugin"]
+
+classifiers=[
+    'Development Status :: 3 - Alpha',
+    'Framework :: Django',
+    'Framework :: Django :: 5.1',
+    'Intended Audience :: Developers',
+    'Intended Audience :: System Administrators',
+    'Intended Audience :: Telecommunications Industry',
+    'Natural Language :: English',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    'Topic :: System :: Networking',
+]
+
+requires-python = ">=3.12.0"
+
+dependencies = [
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "check-manifest==0.51",
+    "ruff==0.9.10",
+    "pre-commit>=3.0.0",
+    "pytest>=9.0.2",
+]
+docs = [
+    "mkdocs-material>=9.0.0",
+    "mkdocs-include-markdown-plugin>=7.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/tak-labo/netbox-pdu-plugin/blob/main/README.md"
+Source = "https://github.com/tak-labo/netbox-pdu-plugin"
+Tracker = "https://github.com/tak-labo/netbox-pdu-plugin/issues"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by ruff-format
+    "B008", # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["netbox_pdu_plugin*"]
+
+[tool.setuptools.package-data]
+netbox_pdu_plugin = [
+    "templates/**",
+    "static/**",
+    "locale/**/*.mo",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["netbox_pdu_plugin/tests"]

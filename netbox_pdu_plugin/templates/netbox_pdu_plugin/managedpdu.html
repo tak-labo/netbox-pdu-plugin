@@ -1,0 +1,181 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+  <div class="row">
+    <div class="col col-md-6">
+      <div class="card">
+        <h2 class="card-header">Managed PDU</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Device</th>
+            <td>{{ object.device|linkify }}</td>
+          </tr>
+          <tr>
+            <th scope="row">API URL</th>
+            <td><code>{{ object.api_url }}</code></td>
+          </tr>
+          <tr>
+            <th scope="row">API Username</th>
+            <td>{{ object.api_username }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Verify SSL</th>
+            <td>{% checkmark object.verify_ssl %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Vendor</th>
+            <td>{{ object.get_vendor_display }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Outlet Count</th>
+            <td>{{ outlet_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Inlet Count</th>
+            <td>{{ inlet_count }}</td>
+          </tr>
+        </table>
+      </div>
+      {% with ifaces=object.network_interfaces.all %}
+      {% if ifaces %}
+      <div class="card">
+        <h2 class="card-header">Network</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Default Gateway</th>
+            <td>{{ object.default_gateway|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">DNS Servers</th>
+            <td>{{ object.dns_servers|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">NTP Servers</th>
+            <td>{{ object.ntp_servers|placeholder }}</td>
+          </tr>
+        </table>
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Interface</th>
+              <th>MAC Address</th>
+              <th>IP Address</th>
+              <th>Config</th>
+              <th>Link Speed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for iface in ifaces %}
+            <tr>
+              <td>{{ iface.interface_name }}</td>
+              <td><code>{{ iface.mac_address|placeholder }}</code></td>
+              <td>{{ iface.ip_address|placeholder }}</td>
+              <td>{{ iface.config_method|placeholder }}</td>
+              <td>{{ iface.link_speed|placeholder }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      {% endwith %}
+      {% include 'inc/panels/custom_fields.html' %}
+    </div>
+    <div class="col col-md-6">
+      <div class="card">
+        <h2 class="card-header">Sync Status</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Status</th>
+            <td>{% badge object.get_sync_status_display bg_color=object.get_sync_status_color %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Last Synced</th>
+            <td>{{ object.last_synced|placeholder }}</td>
+          </tr>
+        </table>
+        {% if perms.netbox_pdu_plugin.change_managedpdu %}
+          <div class="card-footer">
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:managedpdu_sync' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="mdi mdi-refresh"></i> Sync PDU
+              </button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+      {% if object.pdu_model or object.serial_number or object.firmware_version or object.rated_voltage or object.rated_current %}
+      <div class="card">
+        <h2 class="card-header">Hardware Info</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Model</th>
+            <td>{{ object.pdu_model|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Serial Number</th>
+            <td>{{ object.serial_number|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Firmware</th>
+            <td>{{ object.firmware_version|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">HW Revision</th>
+            <td>{{ object.hw_revision|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">MAC Address</th>
+            <td><code>{{ object.pdu_mac_address|placeholder }}</code></td>
+          </tr>
+          <tr>
+            <th scope="row">Rated Voltage</th>
+            <td>{{ object.rated_voltage|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Rated Current</th>
+            <td>{{ object.rated_current|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Rated Frequency</th>
+            <td>{{ object.rated_frequency|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Rated Power</th>
+            <td>{{ object.rated_power|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Device Time</th>
+            <td>{{ object.device_time|placeholder }}</td>
+          </tr>
+        </table>
+      </div>
+      {% endif %}
+      {% include 'inc/panels/tags.html' %}
+      {% include 'inc/panels/comments.html' %}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col col-md-12">
+      <div class="card">
+        <h5 class="card-header">Inlets</h5>
+        <div class="table-responsive">
+          {% render_table inlets_table %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col col-md-12">
+      <div class="card">
+        <h5 class="card-header">Outlets</h5>
+        <div class="table-responsive">
+          {% render_table outlets_table %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}

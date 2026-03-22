@@ -1,0 +1,166 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+
+{% block content %}
+  <div class="row">
+    <div class="col col-md-6">
+      <div class="card">
+        <h2 class="card-header">PDU Outlet</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Managed PDU</th>
+            <td>{{ object.managed_pdu|linkify }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Outlet Number</th>
+            <td>{{ object.outlet_number }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Outlet Name</th>
+            <td>{{ object.outlet_name|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Connected Device</th>
+            <td>{{ object.connected_device|linkify|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Status</th>
+            <td>{% badge object.get_status_display bg_color=object.get_status_color %}</td>
+          </tr>
+        </table>
+      </div>
+      {% include 'inc/panels/custom_fields.html' %}
+      {% include 'inc/panels/tags.html' %}
+      {% include 'inc/panels/comments.html' %}
+    </div>
+    <div class="col col-md-6">
+      <div class="card">
+        <h2 class="card-header">Power Data</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Current (A)</th>
+            <td>
+              {% if object.current_a is not None %}
+                {{ object.current_a|floatformat:2 }} A
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Power (W)</th>
+            <td>
+              {% if object.power_w is not None %}
+                {{ object.power_w|floatformat:2 }} W
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Voltage (V)</th>
+            <td>
+              {% if object.voltage_v is not None %}
+                {{ object.voltage_v|floatformat:2 }} V
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Power Factor</th>
+            <td>
+              {% if object.power_factor is not None %}
+                {{ object.power_factor|floatformat:2 }}
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Accumulated Energy (Wh)</th>
+            <td>
+              {% if object.energy_wh is not None %}
+                {{ object.energy_wh|floatformat:2 }} Wh
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Energy Reset At</th>
+            <td>{{ object.energy_reset_at|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Last Updated from PDU</th>
+            <td>{{ object.last_updated_from_pdu|placeholder }}</td>
+          </tr>
+        </table>
+      </div>
+      {% if thresholds %}
+        <div class="card">
+          <h2 class="card-header">Thresholds</h2>
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Sensor</th>
+                <th>Lower Critical</th>
+                <th>Lower Warning</th>
+                <th>Upper Warning</th>
+                <th>Upper Critical</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in thresholds %}
+                <tr>
+                  <td>{{ t.label }}{% if t.unit %} ({{ t.unit }}){% endif %}</td>
+                  <td>{% if t.lower_critical is not None %}<span class="badge bg-danger">{{ t.lower_critical }}</span>{% else %}—{% endif %}</td>
+                  <td>{% if t.lower_warning is not None %}<span class="badge bg-warning text-dark">{{ t.lower_warning }}</span>{% else %}—{% endif %}</td>
+                  <td>{% if t.upper_warning is not None %}<span class="badge bg-warning text-dark">{{ t.upper_warning }}</span>{% else %}—{% endif %}</td>
+                  <td>{% if t.upper_critical is not None %}<span class="badge bg-danger">{{ t.upper_critical }}</span>{% else %}—{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      {% if perms.netbox_pdu_plugin.change_managedpdu %}
+        <div class="card">
+          <h2 class="card-header">Actions</h2>
+          <div class="card-body d-flex gap-2 flex-wrap">
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_power_on' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm">
+                <i class="mdi mdi-power"></i> Power ON
+              </button>
+            </form>
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_power_off' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger btn-sm">
+                <i class="mdi mdi-power-off"></i> Power OFF
+              </button>
+            </form>
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_power_cycle' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-warning btn-sm">
+                <i class="mdi mdi-restart"></i> Power Cycle
+              </button>
+            </form>
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_sync' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="mdi mdi-refresh"></i> Sync
+              </button>
+            </form>
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_push_name' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="mdi mdi-upload"></i> Push Name to PDU
+              </button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock content %}
