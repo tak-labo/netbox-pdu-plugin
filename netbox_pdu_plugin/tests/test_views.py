@@ -2,7 +2,7 @@
 Test cases for NetBox PDU Plugin views.
 
 Run inside Docker:
-  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_views --parallel -v2
+  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_views -v2
 """
 
 

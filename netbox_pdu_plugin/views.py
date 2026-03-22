@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import django_rq
 from dcim.models import PowerOutlet, PowerPort
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -96,121 +97,122 @@ class ManagedPDUSyncView(View):
         client = get_pdu_client(managed_pdu)
 
         try:
-            now = timezone.now()
+            with transaction.atomic():
+                now = timezone.now()
 
-            # Sync PDU hardware info
-            pdu_info = client.get_pdu_info()
-            managed_pdu.pdu_model = pdu_info.get('model', '')
-            managed_pdu.serial_number = pdu_info.get('serial_number', '')
-            managed_pdu.firmware_version = pdu_info.get('firmware_version', '')
-            managed_pdu.rated_voltage = pdu_info.get('rated_voltage', '')
-            managed_pdu.rated_current = pdu_info.get('rated_current', '')
-            managed_pdu.rated_frequency = pdu_info.get('rated_frequency', '')
-            managed_pdu.rated_power = pdu_info.get('rated_power', '')
-            managed_pdu.hw_revision = pdu_info.get('hw_revision', '')
-            managed_pdu.pdu_mac_address = pdu_info.get('pdu_mac_address', '')
-            managed_pdu.dns_servers = pdu_info.get('dns_servers', '')
-            managed_pdu.default_gateway = pdu_info.get('default_gateway', '')
-            managed_pdu.device_time = _epoch_to_dt(pdu_info.get('device_time_epoch'))
-            managed_pdu.ntp_servers = pdu_info.get('ntp_servers', '')
+                # Sync PDU hardware info
+                pdu_info = client.get_pdu_info()
+                managed_pdu.pdu_model = pdu_info.get('model', '')
+                managed_pdu.serial_number = pdu_info.get('serial_number', '')
+                managed_pdu.firmware_version = pdu_info.get('firmware_version', '')
+                managed_pdu.rated_voltage = pdu_info.get('rated_voltage', '')
+                managed_pdu.rated_current = pdu_info.get('rated_current', '')
+                managed_pdu.rated_frequency = pdu_info.get('rated_frequency', '')
+                managed_pdu.rated_power = pdu_info.get('rated_power', '')
+                managed_pdu.hw_revision = pdu_info.get('hw_revision', '')
+                managed_pdu.pdu_mac_address = pdu_info.get('pdu_mac_address', '')
+                managed_pdu.dns_servers = pdu_info.get('dns_servers', '')
+                managed_pdu.default_gateway = pdu_info.get('default_gateway', '')
+                managed_pdu.device_time = _epoch_to_dt(pdu_info.get('device_time_epoch'))
+                managed_pdu.ntp_servers = pdu_info.get('ntp_servers', '')
 
-            # Sync serial number to Device
-            serial = pdu_info.get('serial_number', '')
-            if serial and managed_pdu.device.serial != serial:
-                managed_pdu.device.serial = serial
-                managed_pdu.device.save(update_fields=['serial'])
-                logger.info('Updated Device serial [%s]: %s', managed_pdu.device, serial)
+                # Sync serial number to Device
+                serial = pdu_info.get('serial_number', '')
+                if serial and managed_pdu.device.serial != serial:
+                    managed_pdu.device.serial = serial
+                    managed_pdu.device.save(update_fields=['serial'])
+                    logger.info('Updated Device serial [%s]: %s', managed_pdu.device, serial)
 
-            models.PDUNetworkInterface.objects.filter(managed_pdu=managed_pdu).delete()
-            for iface in pdu_info.get('network_interfaces', []):
-                models.PDUNetworkInterface.objects.create(
-                    managed_pdu=managed_pdu,
-                    interface_name=iface.get('name', ''),
-                    mac_address=iface.get('mac_address', ''),
-                    ip_address=iface.get('ip_address', ''),
-                    config_method=iface.get('config_method', ''),
-                    link_speed=iface.get('link_speed', ''),
-                )
+                models.PDUNetworkInterface.objects.filter(managed_pdu=managed_pdu).delete()
+                for iface in pdu_info.get('network_interfaces', []):
+                    models.PDUNetworkInterface.objects.create(
+                        managed_pdu=managed_pdu,
+                        interface_name=iface.get('name', ''),
+                        mac_address=iface.get('mac_address', ''),
+                        ip_address=iface.get('ip_address', ''),
+                        config_method=iface.get('config_method', ''),
+                        link_speed=iface.get('link_speed', ''),
+                    )
 
-            # Sync outlets
-            outlet_data_list = client.get_all_outlet_data()
-            outlet_created = 0
-            outlet_updated = 0
+                # Sync outlets
+                outlet_data_list = client.get_all_outlet_data()
+                outlet_created = 0
+                outlet_updated = 0
 
-            for outlet_data in outlet_data_list:
-                outlet_number = outlet_data['outlet_number']
-                switching_state = outlet_data.get('switchingState', 'unknown').lower()
-                if switching_state == 'on':
-                    status = OutletStatusChoices.ON
-                elif switching_state == 'off':
-                    status = OutletStatusChoices.OFF
-                else:
-                    status = OutletStatusChoices.UNKNOWN
+                for outlet_data in outlet_data_list:
+                    outlet_number = outlet_data['outlet_number']
+                    switching_state = outlet_data.get('switchingState', 'unknown').lower()
+                    if switching_state == 'on':
+                        status = OutletStatusChoices.ON
+                    elif switching_state == 'off':
+                        status = OutletStatusChoices.OFF
+                    else:
+                        status = OutletStatusChoices.UNKNOWN
 
-                obj, created = models.PDUOutlet.objects.update_or_create(
-                    managed_pdu=managed_pdu,
-                    outlet_number=outlet_number,
-                    defaults={
-                        'outlet_name': outlet_data.get('name') or outlet_data.get('label', ''),
-                        'status': status,
-                        'current_a': outlet_data.get('current_a'),
-                        'power_w': outlet_data.get('power_w'),
-                        'voltage_v': outlet_data.get('voltage_v'),
-                        'power_factor': outlet_data.get('power_factor'),
-                        'energy_wh': outlet_data.get('energy_wh'),
-                        'energy_reset_at': _epoch_to_dt(outlet_data.get('energy_reset_epoch')),
-                        'last_updated_from_pdu': now,
-                    },
-                )
-                if created:
-                    outlet_created += 1
-                else:
-                    outlet_updated += 1
+                    obj, created = models.PDUOutlet.objects.update_or_create(
+                        managed_pdu=managed_pdu,
+                        outlet_number=outlet_number,
+                        defaults={
+                            'outlet_name': outlet_data.get('name') or outlet_data.get('label', ''),
+                            'status': status,
+                            'current_a': outlet_data.get('current_a'),
+                            'power_w': outlet_data.get('power_w'),
+                            'voltage_v': outlet_data.get('voltage_v'),
+                            'power_factor': outlet_data.get('power_factor'),
+                            'energy_wh': outlet_data.get('energy_wh'),
+                            'energy_reset_at': _epoch_to_dt(outlet_data.get('energy_reset_epoch')),
+                            'last_updated_from_pdu': now,
+                        },
+                    )
+                    if created:
+                        outlet_created += 1
+                    else:
+                        outlet_updated += 1
 
-            # Sync connected_device from NetBox PowerOutlet cable connections
-            nb_outlets = PowerOutlet.objects.filter(device=managed_pdu.device)
-            for nb_outlet in nb_outlets:
-                m = re.search(r'\d+', nb_outlet.name)
-                if not m:
-                    continue
-                outlet_num = int(m.group())
-                peers = nb_outlet.link_peers
-                connected = peers[0].device if peers else None
-                models.PDUOutlet.objects.filter(
-                    managed_pdu=managed_pdu,
-                    outlet_number=outlet_num,
-                ).update(connected_device=connected)
+                # Sync connected_device from NetBox PowerOutlet cable connections
+                nb_outlets = PowerOutlet.objects.filter(device=managed_pdu.device)
+                for nb_outlet in nb_outlets:
+                    m = re.search(r'\d+', nb_outlet.name)
+                    if not m:
+                        continue
+                    outlet_num = int(m.group())
+                    peers = nb_outlet.link_peers
+                    connected = peers[0].device if peers else None
+                    models.PDUOutlet.objects.filter(
+                        managed_pdu=managed_pdu,
+                        outlet_number=outlet_num,
+                    ).update(connected_device=connected)
 
-            # Sync inlets
-            inlet_data_list = client.get_all_inlet_data()
-            inlet_created = 0
-            inlet_updated = 0
+                # Sync inlets
+                inlet_data_list = client.get_all_inlet_data()
+                inlet_created = 0
+                inlet_updated = 0
 
-            for inlet_data in inlet_data_list:
-                obj, created = models.PDUInlet.objects.update_or_create(
-                    managed_pdu=managed_pdu,
-                    inlet_number=inlet_data['inlet_number'],
-                    defaults={
-                        'inlet_name': inlet_data.get('name', ''),
-                        'current_a': inlet_data.get('current_a'),
-                        'power_w': inlet_data.get('power_w'),
-                        'apparent_power_va': inlet_data.get('apparent_power_va'),
-                        'voltage_v': inlet_data.get('voltage_v'),
-                        'power_factor': inlet_data.get('power_factor'),
-                        'frequency_hz': inlet_data.get('frequency_hz'),
-                        'energy_wh': inlet_data.get('energy_wh'),
-                        'energy_reset_at': _epoch_to_dt(inlet_data.get('energy_reset_epoch')),
-                        'last_updated_from_pdu': now,
-                    },
-                )
-                if created:
-                    inlet_created += 1
-                else:
-                    inlet_updated += 1
+                for inlet_data in inlet_data_list:
+                    obj, created = models.PDUInlet.objects.update_or_create(
+                        managed_pdu=managed_pdu,
+                        inlet_number=inlet_data['inlet_number'],
+                        defaults={
+                            'inlet_name': inlet_data.get('name', ''),
+                            'current_a': inlet_data.get('current_a'),
+                            'power_w': inlet_data.get('power_w'),
+                            'apparent_power_va': inlet_data.get('apparent_power_va'),
+                            'voltage_v': inlet_data.get('voltage_v'),
+                            'power_factor': inlet_data.get('power_factor'),
+                            'frequency_hz': inlet_data.get('frequency_hz'),
+                            'energy_wh': inlet_data.get('energy_wh'),
+                            'energy_reset_at': _epoch_to_dt(inlet_data.get('energy_reset_epoch')),
+                            'last_updated_from_pdu': now,
+                        },
+                    )
+                    if created:
+                        inlet_created += 1
+                    else:
+                        inlet_updated += 1
 
-            managed_pdu.last_synced = now
-            managed_pdu.sync_status = SyncStatusChoices.SUCCESS
-            managed_pdu.save()
+                managed_pdu.last_synced = now
+                managed_pdu.sync_status = SyncStatusChoices.SUCCESS
+                managed_pdu.save()
 
             messages.success(
                 request,
@@ -280,14 +282,6 @@ class PDUOutletSyncView(View):
         return redirect(request.META.get('HTTP_REFERER') or outlet.get_absolute_url())
 
 
-_OUTLET_THRESHOLD_SENSORS = [
-    ('current',     'Current',      'A'),
-    ('activePower', 'Active Power', 'W'),
-    ('voltage',     'Voltage',      'V'),
-    ('powerFactor', 'Power Factor', ''),
-]
-
-
 @register_model_view(models.PDUOutlet)
 class PDUOutletView(generic.ObjectView):
     queryset = models.PDUOutlet.objects.all()
@@ -296,34 +290,8 @@ class PDUOutletView(generic.ObjectView):
         thresholds = []
         try:
             client = get_pdu_client(instance.managed_pdu)
-            rids = client._get_outlet_rids()
-            idx = instance.outlet_number - 1
-            if idx < len(rids):
-                sensors = client._rpc(rids[idx], 'getSensors') or {}
-                for sensor_key, label, unit in _OUTLET_THRESHOLD_SENSORS:
-                    if sensor_key not in sensors:
-                        continue
-                    sensor_rid = sensors[sensor_key]
-                    if isinstance(sensor_rid, dict):
-                        sensor_rid = sensor_rid.get('rid', '')
-                    try:
-                        t = client._rpc(sensor_rid, 'getThresholds') or {}
-                    except PDUClientError:
-                        continue
-                    if not any([
-                        t.get('upperCriticalActive'), t.get('upperWarningActive'),
-                        t.get('lowerWarningActive'), t.get('lowerCriticalActive'),
-                    ]):
-                        continue
-                    thresholds.append({
-                        'label': label,
-                        'unit': unit,
-                        'lower_critical': t['lowerCritical'] if t.get('lowerCriticalActive') else None,
-                        'lower_warning':  t['lowerWarning']  if t.get('lowerWarningActive')  else None,
-                        'upper_warning':  t['upperWarning']  if t.get('upperWarningActive')  else None,
-                        'upper_critical': t['upperCritical'] if t.get('upperCriticalActive') else None,
-                    })
-        except (PDUClientError, AttributeError):
+            thresholds = client.get_outlet_thresholds(instance.outlet_number - 1)
+        except PDUClientError:
             pass
         return {'thresholds': thresholds}
 
@@ -442,16 +410,14 @@ class PDUOutletPushNameView(View):
             messages.error(request, f'Failed to push name: {e}')
             logger.error('Push name failed [%s]: %s', outlet, e)
 
-        # Device側の対応するPowerOutletのlabelも更新
-        power_outlets = list(
-            PowerOutlet.objects.filter(device=outlet.managed_pdu.device).order_by('name', 'pk')
-        )
-        idx = outlet.outlet_number - 1
-        if idx < len(power_outlets):
-            po = power_outlets[idx]
-            po.label = outlet.outlet_name
-            po.save(update_fields=['label'])
-            messages.info(request, f'PowerOutlet "{po.name}" label updated to "{outlet.outlet_name}".')
+        # Update the label of the matching NetBox PowerOutlet (matched by outlet number in name)
+        for po in PowerOutlet.objects.filter(device=outlet.managed_pdu.device):
+            m = re.search(r'\d+', po.name)
+            if m and int(m.group()) == outlet.outlet_number:
+                po.label = outlet.outlet_name
+                po.save(update_fields=['label'])
+                messages.info(request, f'PowerOutlet "{po.name}" label updated to "{outlet.outlet_name}".')
+                break
 
         return redirect(request.META.get('HTTP_REFERER') or outlet.get_absolute_url())
 
@@ -503,6 +469,11 @@ class PDUInletPushNameView(View):
 
     def post(self, request, pk):
         inlet = get_object_or_404(models.PDUInlet, pk=pk)
+
+        if not request.user.has_perm('netbox_pdu_plugin.change_managedpdu'):
+            messages.error(request, _('You do not have permission to update this PDU.'))
+            return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
+
         if not inlet.inlet_name:
             messages.warning(request, 'Inlet name is empty — nothing to push.')
             return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
@@ -517,26 +488,16 @@ class PDUInletPushNameView(View):
         except PDUClientError as e:
             messages.error(request, f'Failed to push inlet name: {e}')
 
-        # Device側の対応するPowerPortのlabelも更新
-        power_ports = list(
-            PowerPort.objects.filter(device=inlet.managed_pdu.device).order_by('name', 'pk')
-        )
-        idx = inlet.inlet_number - 1
-        if idx < len(power_ports):
-            pp = power_ports[idx]
-            pp.label = inlet.inlet_name
-            pp.save(update_fields=['label'])
-            messages.info(request, f'PowerPort "{pp.name}" label updated to "{inlet.inlet_name}".')
+        # Update the label of the matching NetBox PowerPort (matched by inlet number in name)
+        for pp in PowerPort.objects.filter(device=inlet.managed_pdu.device):
+            m = re.search(r'\d+', pp.name)
+            if m and int(m.group()) == inlet.inlet_number:
+                pp.label = inlet.inlet_name
+                pp.save(update_fields=['label'])
+                messages.info(request, f'PowerPort "{pp.name}" label updated to "{inlet.inlet_name}".')
+                break
 
         return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
-
-
-_INLET_THRESHOLD_SENSORS = [
-    ('current',      'Current',       'A'),
-    ('voltage',      'Voltage',       'V'),
-    ('activePower',  'Active Power',  'W'),
-    ('apparentPower','Apparent Power','VA'),
-]
 
 
 @register_model_view(models.PDUInlet)
@@ -547,35 +508,8 @@ class PDUInletView(generic.ObjectView):
         thresholds = []
         try:
             client = get_pdu_client(instance.managed_pdu)
-            rids = client._get_inlet_rids()
-            idx = instance.inlet_number - 1
-            if idx < len(rids):
-                sensors = client._rpc(rids[idx], 'getSensors') or {}
-                for sensor_key, label, unit in _INLET_THRESHOLD_SENSORS:
-                    if sensor_key not in sensors:
-                        continue
-                    sensor_rid = sensors[sensor_key]
-                    if isinstance(sensor_rid, dict):
-                        sensor_rid = sensor_rid.get('rid', '')
-                    try:
-                        t = client._rpc(sensor_rid, 'getThresholds') or {}
-                    except PDUClientError:
-                        continue
-                    # アクティブなしきい値のみ表示
-                    if not any([
-                        t.get('upperCriticalActive'), t.get('upperWarningActive'),
-                        t.get('lowerWarningActive'), t.get('lowerCriticalActive'),
-                    ]):
-                        continue
-                    thresholds.append({
-                        'label': label,
-                        'unit': unit,
-                        'lower_critical': t['lowerCritical'] if t.get('lowerCriticalActive') else None,
-                        'lower_warning':  t['lowerWarning']  if t.get('lowerWarningActive')  else None,
-                        'upper_warning':  t['upperWarning']  if t.get('upperWarningActive')  else None,
-                        'upper_critical': t['upperCritical'] if t.get('upperCriticalActive') else None,
-                    })
-        except (PDUClientError, AttributeError):
+            thresholds = client.get_inlet_thresholds(instance.inlet_number - 1)
+        except PDUClientError:
             pass
         return {'thresholds': thresholds}
 

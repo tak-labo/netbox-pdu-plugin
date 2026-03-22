@@ -2,7 +2,7 @@
 Test cases for NetBox PDU Plugin models.
 
 Run inside Docker:
-  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_models --parallel -v2
+  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_models -v2
 """
 
 from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site

@@ -107,3 +107,27 @@ class BasePDUClient(ABC):
     @abstractmethod
     def set_inlet_name(self, inlet_index: int, name: str) -> None:
         """Push a display name to the PDU inlet (0-indexed)."""
+
+    def get_outlet_thresholds(self, outlet_index: int) -> list[dict]:
+        """
+        Return threshold data for one outlet (0-indexed).
+
+        Each dict must contain:
+            label          (str)        - sensor label (e.g. 'Current')
+            unit           (str)        - unit string (e.g. 'A')
+            lower_critical (float|None)
+            lower_warning  (float|None)
+            upper_warning  (float|None)
+            upper_critical (float|None)
+
+        Default implementation returns [] (vendor does not support thresholds).
+        Override in backends that support threshold retrieval.
+        """
+        return []
+
+    def get_inlet_thresholds(self, inlet_index: int) -> list[dict]:
+        """
+        Return threshold data for one inlet (0-indexed). Same dict format as get_outlet_thresholds.
+        Default implementation returns [].
+        """
+        return []

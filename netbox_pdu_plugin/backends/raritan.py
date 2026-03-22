@@ -397,3 +397,65 @@ class RaritanPDUClient(BasePDUClient):
         current['name'] = name
         self._rpc(rid, 'setSettings', {'settings': current})
         logger.info('Set inlet %d name to %r', inlet_index + 1, name)
+
+    # ------------------------------------------------------------------
+    # Threshold retrieval (Raritan-specific, optional interface)
+    # ------------------------------------------------------------------
+
+    _THRESHOLD_SENSORS_OUTLET = [
+        ('current',     'Current',      'A'),
+        ('activePower', 'Active Power', 'W'),
+        ('voltage',     'Voltage',      'V'),
+        ('powerFactor', 'Power Factor', ''),
+    ]
+
+    _THRESHOLD_SENSORS_INLET = [
+        ('current',       'Current',       'A'),
+        ('voltage',       'Voltage',       'V'),
+        ('activePower',   'Active Power',  'W'),
+        ('apparentPower', 'Apparent Power', 'VA'),
+    ]
+
+    def _fetch_thresholds_for_rid(self, rid: str, sensor_keys: list[tuple]) -> list[dict]:
+        """Fetch threshold data for one outlet/inlet RID."""
+        thresholds = []
+        try:
+            sensors = self._rpc(rid, 'getSensors') or {}
+        except PDUClientError:
+            return []
+        for sensor_key, label, unit in sensor_keys:
+            if sensor_key not in sensors:
+                continue
+            sensor_rid = sensors[sensor_key]
+            if isinstance(sensor_rid, dict):
+                sensor_rid = sensor_rid.get('rid', '')
+            try:
+                t = self._rpc(sensor_rid, 'getThresholds') or {}
+            except PDUClientError:
+                continue
+            if not any([
+                t.get('upperCriticalActive'), t.get('upperWarningActive'),
+                t.get('lowerWarningActive'), t.get('lowerCriticalActive'),
+            ]):
+                continue
+            thresholds.append({
+                'label': label,
+                'unit': unit,
+                'lower_critical': t['lowerCritical'] if t.get('lowerCriticalActive') else None,
+                'lower_warning':  t['lowerWarning']  if t.get('lowerWarningActive')  else None,
+                'upper_warning':  t['upperWarning']  if t.get('upperWarningActive')  else None,
+                'upper_critical': t['upperCritical'] if t.get('upperCriticalActive') else None,
+            })
+        return thresholds
+
+    def get_outlet_thresholds(self, outlet_index: int) -> list[dict]:
+        rids = self._get_outlet_rids()
+        if outlet_index >= len(rids):
+            return []
+        return self._fetch_thresholds_for_rid(rids[outlet_index], self._THRESHOLD_SENSORS_OUTLET)
+
+    def get_inlet_thresholds(self, inlet_index: int) -> list[dict]:
+        rids = self._get_inlet_rids()
+        if inlet_index >= len(rids):
+            return []
+        return self._fetch_thresholds_for_rid(rids[inlet_index], self._THRESHOLD_SENSORS_INLET)

@@ -64,7 +64,7 @@ Uses NetBox generics (`netbox.views.generic`) and `@register_model_view`. Key no
 
 - `ManagedPDUSyncView` — calls `get_pdu_client()`, updates all outlets/inlets/network interfaces, sets `sync_status`/`last_synced`
 - `PDUOutletPowerView` — sends power commands (on/off/cycle); cycle enqueues `jobs.update_outlet_status` via `django_rq`
-- `ManagedPDUPushNameView`, `PDUOutletPushNameView`, `PDUInletPushNameView` — write names back to PDU; also update `PowerOutlet.label`/`PowerPort.label` on connected NetBox device
+- `PDUOutletPushNameView`, `PDUInletPushNameView` — write names back to PDU; also update `PowerOutlet.label`/`PowerPort.label` on connected NetBox device
 
 ### Background Jobs (`jobs.py`)
 
@@ -88,6 +88,7 @@ Strawberry/strawberry-django. Covers all three main models. `enums.py` mirrors `
 - **`api_password`** is stored as plaintext — never expose it in API responses or logs
 - **`PDUNetworkInterface`** is replaced entirely (delete + recreate) on each sync, not updated in place
 - **pre-push hook**: `uvx pre-commit install --hook-type pre-push` (runs lint + Docker tests before every push)
+- **UniFi power cycle**: `UniFiPDUClient.set_outlet_power_state('cycle')` calls `time.sleep(3)` internally to wait for the PDU to complete the cycle before re-reading state. This blocks the web worker thread for 3 seconds — known limitation, do not remove the sleep.
 
 ## Testing
 

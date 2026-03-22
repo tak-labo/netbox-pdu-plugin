@@ -2,7 +2,7 @@
 Test cases for NetBox PDU Plugin REST API.
 
 Run inside Docker:
-  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_api --parallel -v2
+  docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_api -v2
 """
 
 from ..models import ManagedPDU, PDUInlet, PDUOutlet
