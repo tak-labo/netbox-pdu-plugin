@@ -5,8 +5,11 @@ Run inside Docker:
   docker compose exec netbox python manage.py test netbox_pdu_plugin.tests.test_views -v2
 """
 
+from unittest.mock import MagicMock, patch
 
-from ..choices import VendorChoices
+from django.urls import reverse
+
+from ..choices import OutletStatusChoices, VendorChoices
 from ..models import ManagedPDU, PDUInlet, PDUOutlet
 from ..testing import PluginViewTestCase
 from ..testing.utils import disable_warnings
@@ -152,3 +155,146 @@ class PDUInletViewTest(PluginViewTestCase):
         url = self._get_url('detail', self.inlet)
         response = self.client.get(url)
         self.assertHttpStatus(response, 200)
+
+
+class PDUOutletPowerViewTest(PluginViewTestCase):
+    """Tests for PDUOutlet power control views (ON / OFF / cycle)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pdu = create_test_pdu()
+        cls.outlet = PDUOutlet.objects.create(
+            managed_pdu=cls.pdu,
+            outlet_number=1,
+            outlet_name='Outlet 1',
+        )
+
+    def _url(self, action):
+        return reverse(f'plugins:netbox_pdu_plugin:pduoutlet_{action}', kwargs={'pk': self.outlet.pk})
+
+    def test_power_on_without_permission(self):
+        # View does its own permission check and redirects — no 403.
+        response = self.client.post(self._url('power_on'))
+        self.assertHttpStatus(response, 302)
+
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_power_on(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_client.get_outlet_power_state_by_index.return_value = 'on'
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(self._url('power_on'))
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_called_once_with(0, 'on')
+        mock_client.get_outlet_power_state_by_index.assert_called_once_with(0)
+        self.outlet.refresh_from_db()
+        self.assertEqual(self.outlet.status, OutletStatusChoices.ON)
+
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_power_off(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_client.get_outlet_power_state_by_index.return_value = 'off'
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(self._url('power_off'))
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_called_once_with(0, 'off')
+        self.outlet.refresh_from_db()
+        self.assertEqual(self.outlet.status, OutletStatusChoices.OFF)
+
+    @patch('netbox_pdu_plugin.views.django_rq')
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_power_cycle(self, mock_get_client, mock_rq):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_queue = MagicMock()
+        mock_rq.get_queue.return_value = mock_queue
+
+        response = self.client.post(self._url('power_cycle'))
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_called_once_with(0, 'cycle')
+        # Background job must be enqueued for cycle
+        mock_queue.enqueue_in.assert_called_once()
+
+    def test_power_on_without_permission_does_not_call_backend(self):
+        with patch('netbox_pdu_plugin.views.get_pdu_client') as mock_get_client:
+            self.client.post(self._url('power_on'))
+            mock_get_client.assert_not_called()
+
+
+class PDUOutletPushNameViewTest(PluginViewTestCase):
+    """Tests for PDUOutletPushNameView."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pdu = create_test_pdu()
+        cls.outlet = PDUOutlet.objects.create(
+            managed_pdu=cls.pdu,
+            outlet_number=1,
+            outlet_name='Test Server',
+        )
+
+    def _url(self):
+        return reverse('plugins:netbox_pdu_plugin:pduoutlet_push_name', kwargs={'pk': self.outlet.pk})
+
+    def test_push_name_without_permission_redirects(self):
+        response = self.client.post(self._url())
+        self.assertHttpStatus(response, 302)
+
+    def test_push_name_without_permission_does_not_call_backend(self):
+        with patch('netbox_pdu_plugin.views.get_pdu_client') as mock_get_client:
+            self.client.post(self._url())
+            mock_get_client.assert_not_called()
+
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_push_name(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(self._url())
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_name.assert_called_once_with(0, 'Test Server')
+
+
+class PDUInletPushNameViewTest(PluginViewTestCase):
+    """Tests for PDUInletPushNameView."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pdu = create_test_pdu()
+        cls.inlet = PDUInlet.objects.create(
+            managed_pdu=cls.pdu,
+            inlet_number=1,
+            inlet_name='Main Input',
+        )
+
+    def _url(self):
+        return reverse('plugins:netbox_pdu_plugin:pduinlet_push_name', kwargs={'pk': self.inlet.pk})
+
+    def test_push_name_without_permission_redirects(self):
+        response = self.client.post(self._url())
+        self.assertHttpStatus(response, 302)
+
+    def test_push_name_without_permission_does_not_call_backend(self):
+        with patch('netbox_pdu_plugin.views.get_pdu_client') as mock_get_client:
+            self.client.post(self._url())
+            mock_get_client.assert_not_called()
+
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_push_name(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(self._url())
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_inlet_name.assert_called_once_with(0, 'Main Input')

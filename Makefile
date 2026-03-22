@@ -6,11 +6,11 @@ netbox_docker_dir = ../netbox-docker
 test: format lint unittest
 
 format:
-	ruff check --select I --fix $(sources) tests
-	ruff format $(sources) tests
+	uvx ruff check --select I --fix $(sources) tests
+	uvx ruff format $(sources) tests
 
 lint:
-	ruff check $(sources) tests
+	uvx ruff check $(sources) tests
 
 pre-commit:
 	pre-commit run --all-files
