@@ -145,4 +145,4 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
         run: |
-          python manage.py test netbox_pdu_plugin.tests --parallel --keepdb -v 2
+          python manage.py test netbox_pdu_plugin.tests --keepdb -v 2
