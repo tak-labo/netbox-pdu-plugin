@@ -86,6 +86,7 @@ Strawberry/strawberry-django. Covers all three main models. `enums.py` mirrors `
 - **Exception re-raises**: always `raise ... from e` in except blocks (B904)
 - **`api_password`** is stored as plaintext — never expose it in API responses or logs
 - **`PDUNetworkInterface`** is replaced entirely (delete + recreate) on each sync, not updated in place
+- **`ManagedPDUSyncView`** wraps all DB writes in `transaction.atomic()`; on failure only `sync_status` is saved via `update_fields=['sync_status']`
 - **pre-push hook**: `uvx pre-commit install --hook-type pre-push` (runs lint + Docker tests before every push)
 - **UniFi power cycle**: contains `time.sleep(3)` — known blocking limitation, do not remove
 
@@ -94,4 +95,5 @@ Strawberry/strawberry-django. Covers all three main models. `enums.py` mirrors `
 - **Integration tests** (`tests/test_models.py`, `test_api.py`, `test_views.py`, `test_graphql.py`): require running netbox-docker. Use `manage.py test`.
 - **Unit tests** (`tests/test_backends_raritan.py`, `tests/test_backends_unifi.py`): mock HTTP, no DB needed. Use `uvx pytest`.
 - View POST tests use superuser (`is_superuser=True`) to bypass NetBox `ObjectPermission` system.
+- Power control and push-name view tests mock the backend via `@patch('netbox_pdu_plugin.views.get_pdu_client')` — no Docker required.
 - `testing/configuration.py` is the Django settings file used during CI and Docker test runs.
