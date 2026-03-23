@@ -42,7 +42,7 @@ class ManagedPDU(NetBoxModel):
         verbose_name=_("API Password"),
     )
     verify_ssl = models.BooleanField(
-        default=True,
+        default=False,
         verbose_name=_("Verify SSL"),
         help_text=_("Verify the SSL certificate when connecting via HTTPS"),
     )
