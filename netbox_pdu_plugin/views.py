@@ -273,6 +273,9 @@ class ManagedPDUGetMetricsView(View):
                 ocp_updated,
             )
         except PDUClientError as e:
+            from .choices import SyncStatusChoices
+            managed_pdu.metrics_status = SyncStatusChoices.FAILED
+            managed_pdu.save(update_fields=["metrics_status"])
             messages.error(request, f"Metrics fetch error: {e}")
             logger.error("Metrics fetch failed [%s]: %s", managed_pdu, e)
 

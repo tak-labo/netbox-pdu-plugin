@@ -100,6 +100,10 @@
             <td>{{ object.last_synced|placeholder }}</td>
           </tr>
           <tr>
+            <th scope="row">Metrics Status</th>
+            <td>{% badge object.get_metrics_status_display bg_color=object.get_metrics_status_color %}</td>
+          </tr>
+          <tr>
             <th scope="row">Last Metrics Fetched</th>
             <td>{{ object.last_metrics_fetched|placeholder }}</td>
           </tr>

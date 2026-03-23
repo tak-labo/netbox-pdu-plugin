@@ -56,6 +56,12 @@ class ManagedPDU(NetBoxModel):
         blank=True,
         verbose_name=_("Last Metrics Fetched"),
     )
+    metrics_status = models.CharField(
+        max_length=30,
+        choices=SyncStatusChoices,
+        default=SyncStatusChoices.NEVER,
+        verbose_name=_("Metrics Status"),
+    )
     sync_status = models.CharField(
         max_length=30,
         choices=SyncStatusChoices,
@@ -147,6 +153,9 @@ class ManagedPDU(NetBoxModel):
 
     def get_sync_status_color(self):
         return SyncStatusChoices.colors.get(self.sync_status)
+
+    def get_metrics_status_color(self):
+        return SyncStatusChoices.colors.get(self.metrics_status)
 
     @property
     def phase_type(self):

@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from .backends import get_pdu_client
 from .backends.base import PDUClientError
-from .choices import OutletStatusChoices
+from .choices import OutletStatusChoices, SyncStatusChoices
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,8 @@ def fetch_pdu_metrics(managed_pdu):
             ocp_updated += 1
 
     managed_pdu.last_metrics_fetched = now
-    managed_pdu.save(update_fields=["last_metrics_fetched"])
+    managed_pdu.metrics_status = SyncStatusChoices.SUCCESS
+    managed_pdu.save(update_fields=["last_metrics_fetched", "metrics_status"])
 
     return outlet_updated, inlet_updated, ocp_updated
 
@@ -160,5 +161,7 @@ if _metrics_interval > 0:
                     success += 1
                 except Exception as e:
                     self.logger.error(f"Metrics fetch failed [{pdu}]: {e}")
+                    pdu.metrics_status = SyncStatusChoices.FAILED
+                    pdu.save(update_fields=["metrics_status"])
                     failed += 1
             self.logger.info(f"Periodic metrics complete: {success} OK, {failed} failed")

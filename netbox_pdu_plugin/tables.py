@@ -22,6 +22,8 @@ class ManagedPDUTable(NetBoxTable):
     api_url = tables.Column(verbose_name="API URL")
     sync_status = ChoiceFieldColumn(verbose_name="Sync Status")
     last_synced = tables.DateTimeColumn(verbose_name="Last Synced")
+    metrics_status = ChoiceFieldColumn(verbose_name="Metrics Status")
+    last_metrics_fetched = tables.DateTimeColumn(verbose_name="Last Metrics Fetched")
     outlet_count = tables.Column(verbose_name="Outlets")
     pdu_model = tables.Column(verbose_name="Model")
     serial_number = tables.Column(verbose_name="Serial")
@@ -41,6 +43,8 @@ class ManagedPDUTable(NetBoxTable):
             "firmware_version",
             "sync_status",
             "last_synced",
+            "metrics_status",
+            "last_metrics_fetched",
             "outlet_count",
             "actions",
         )
