@@ -281,6 +281,7 @@ class ManagedPDUGetMetricsView(View):
 
                 inlet_updated = 0
                 for inlet_data in data.get("inlets", []):
+                    inlet_number = inlet_data["inlet_number"]
                     update_fields = {
                         "current_a": inlet_data.get("current_a"),
                         "power_w": inlet_data.get("power_w"),
@@ -289,27 +290,72 @@ class ManagedPDUGetMetricsView(View):
                         "power_factor": inlet_data.get("power_factor"),
                         "frequency_hz": inlet_data.get("frequency_hz"),
                         "energy_wh": inlet_data.get("energy_wh"),
+                        # 3-phase poleline and unbalance
+                        "poleline_l1_current_a": inlet_data.get("poleline_l1_current_a"),
+                        "poleline_l2_current_a": inlet_data.get("poleline_l2_current_a"),
+                        "poleline_l3_current_a": inlet_data.get("poleline_l3_current_a"),
+                        "unbalanced_current_pct": inlet_data.get("unbalanced_current_pct"),
+                        "unbalanced_ll_current_pct": inlet_data.get("unbalanced_ll_current_pct"),
+                        "unbalanced_ll_voltage_pct": inlet_data.get("unbalanced_ll_voltage_pct"),
                         "last_updated_from_pdu": now,
                     }
                     if inlet_data.get("name"):
                         update_fields["inlet_name"] = inlet_data["name"]
                     inlet_updated += models.PDUInlet.objects.filter(
                         managed_pdu=managed_pdu,
-                        inlet_number=inlet_data["inlet_number"],
+                        inlet_number=inlet_number,
                     ).update(**update_fields)
+
+                    # Linepairs: replace entirely (delete + recreate)
+                    models.PDUInletLinePair.objects.filter(
+                        managed_pdu=managed_pdu,
+                        inlet_number=inlet_number,
+                    ).delete()
+                    for lp in inlet_data.get("linepairs", []):
+                        models.PDUInletLinePair.objects.create(
+                            managed_pdu=managed_pdu,
+                            inlet_number=inlet_number,
+                            line_pair=lp["line_pair"],
+                            voltage_v=lp.get("voltage_v"),
+                            current_a=lp.get("current_a"),
+                            power_w=lp.get("power_w"),
+                            apparent_power_va=lp.get("apparent_power_va"),
+                            power_factor=lp.get("power_factor"),
+                            energy_wh=lp.get("energy_wh"),
+                            last_updated_from_pdu=now,
+                        )
+
+                # OCPs: update or create
+                ocp_updated = 0
+                for ocp_data in data.get("ocps", []):
+                    _ocp_obj, created = models.PDUOverCurrentProtector.objects.update_or_create(
+                        managed_pdu=managed_pdu,
+                        ocp_id=ocp_data["ocp_id"],
+                        defaults={
+                            "rating_current_a": ocp_data.get("rating_current_a"),
+                            "current_a": ocp_data.get("current_a"),
+                            "poleline_l1_current_a": ocp_data.get("poleline_l1_current_a"),
+                            "poleline_l2_current_a": ocp_data.get("poleline_l2_current_a"),
+                            "poleline_l3_current_a": ocp_data.get("poleline_l3_current_a"),
+                            "tripped": ocp_data.get("tripped"),
+                            "last_updated_from_pdu": now,
+                        },
+                    )
+                    ocp_updated += 1
 
             managed_pdu.last_metrics_fetched = now
             managed_pdu.save(update_fields=["last_metrics_fetched"])
 
             messages.success(
                 request,
-                f"Metrics updated: {outlet_updated} outlets, {inlet_updated} inlets.",
+                f"Metrics updated: {outlet_updated} outlets, {inlet_updated} inlets, {ocp_updated} OCPs.",
             )
             logger.info(
-                "Metrics fetch succeeded [%s]: outlets=%d inlets=%d",
+                "Metrics fetch succeeded [%s]: outlets=%d inlets=%d ocps=%d",
                 managed_pdu,
                 outlet_updated,
                 inlet_updated,
+                ocp_updated,
             )
 
         except PDUClientError as e:
