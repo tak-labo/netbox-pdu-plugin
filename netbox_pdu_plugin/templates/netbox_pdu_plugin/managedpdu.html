@@ -220,7 +220,7 @@
                 <td>{% if ocp.poleline_l3_current_a is not None %}{{ ocp.poleline_l3_current_a|floatformat:2 }}{% else %}—{% endif %}</td>
                 <td>
                   {% if ocp.tripped is None %}
-                    <span class="badge bg-secondary">Unknown</span>
+                    <span class="badge bg-secondary text-white">Unknown</span>
                   {% elif ocp.tripped %}
                     <span class="badge bg-danger">Tripped</span>
                   {% else %}
