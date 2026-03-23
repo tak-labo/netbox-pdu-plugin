@@ -1,0 +1,11 @@
+<div class="card">
+  <h2 class="card-header">PDU Outlets</h2>
+  <table class="table table-hover attr-table">
+    {% for outlet in pdu_outlets %}
+    <tr>
+      <th scope="row">{{ outlet.managed_pdu.device.name }}</th>
+      <td><a href="{{ outlet.get_absolute_url }}">Outlet {{ outlet.outlet_number }}{% if outlet.outlet_name %} — {{ outlet.outlet_name }}{% endif %}</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
