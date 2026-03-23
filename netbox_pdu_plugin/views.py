@@ -52,11 +52,14 @@ class ManagedPDUView(generic.ObjectView):
         inlets_table.columns.hide("managed_pdu")
         inlets_table.configure(request)
 
+        ocps = list(instance.ocps.order_by("ocp_id"))
+
         return {
             "outlets_table": outlets_table,
             "outlet_count": outlets.count(),
             "inlets_table": inlets_table,
             "inlet_count": inlets.count(),
+            "ocps": ocps,
         }
 
 
@@ -657,7 +660,13 @@ class PDUInletView(generic.ObjectView):
             thresholds = client.get_inlet_thresholds(instance.inlet_number - 1)
         except PDUClientError:
             pass
-        return {"thresholds": thresholds}
+        linepairs = list(
+            models.PDUInletLinePair.objects.filter(
+                managed_pdu=instance.managed_pdu,
+                inlet_number=instance.inlet_number,
+            ).order_by("line_pair")
+        )
+        return {"thresholds": thresholds, "linepairs": linepairs}
 
 
 @register_model_view(models.PDUInlet, name="edit")

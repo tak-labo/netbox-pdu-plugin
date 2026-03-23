@@ -178,6 +178,53 @@
       </div>
     </div>
   </div>
+  {% if ocps %}
+  <div class="row">
+    <div class="col col-md-12">
+      <div class="card">
+        <h5 class="card-header">Over-Current Protectors</h5>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>OCP</th>
+                <th>Rating (A)</th>
+                <th>Current (A)</th>
+                <th>L1 (A)</th>
+                <th>L2 (A)</th>
+                <th>L3 (A)</th>
+                <th>Status</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ocp in ocps %}
+              <tr>
+                <td>{{ ocp.ocp_id }}</td>
+                <td>{% if ocp.rating_current_a is not None %}{{ ocp.rating_current_a|floatformat:1 }} A{% else %}—{% endif %}</td>
+                <td>{% if ocp.current_a is not None %}{{ ocp.current_a|floatformat:2 }} A{% else %}—{% endif %}</td>
+                <td>{% if ocp.poleline_l1_current_a is not None %}{{ ocp.poleline_l1_current_a|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>{% if ocp.poleline_l2_current_a is not None %}{{ ocp.poleline_l2_current_a|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>{% if ocp.poleline_l3_current_a is not None %}{{ ocp.poleline_l3_current_a|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if ocp.tripped is None %}
+                    <span class="badge bg-secondary">Unknown</span>
+                  {% elif ocp.tripped %}
+                    <span class="badge bg-danger">Tripped</span>
+                  {% else %}
+                    <span class="badge bg-success">Normal</span>
+                  {% endif %}
+                </td>
+                <td>{{ ocp.last_updated_from_pdu|placeholder }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <div class="row">
     <div class="col col-md-12">
       <div class="card">

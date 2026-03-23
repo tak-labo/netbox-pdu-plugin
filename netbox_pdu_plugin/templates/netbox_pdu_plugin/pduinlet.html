@@ -109,6 +109,74 @@
           </tr>
         </table>
       </div>
+      {% if object.poleline_l1_current_a is not None or object.poleline_l2_current_a is not None or object.poleline_l3_current_a is not None %}
+      <div class="card">
+        <h2 class="card-header">Per-Phase Currents</h2>
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">L1 Current (A)</th>
+            <td>{% if object.poleline_l1_current_a is not None %}{{ object.poleline_l1_current_a|floatformat:2 }} A{% else %}{{ ""|placeholder }}{% endif %}</td>
+          </tr>
+          <tr>
+            <th scope="row">L2 Current (A)</th>
+            <td>{% if object.poleline_l2_current_a is not None %}{{ object.poleline_l2_current_a|floatformat:2 }} A{% else %}{{ ""|placeholder }}{% endif %}</td>
+          </tr>
+          <tr>
+            <th scope="row">L3 Current (A)</th>
+            <td>{% if object.poleline_l3_current_a is not None %}{{ object.poleline_l3_current_a|floatformat:2 }} A{% else %}{{ ""|placeholder }}{% endif %}</td>
+          </tr>
+          {% if object.unbalanced_current_pct is not None %}
+          <tr>
+            <th scope="row">Current Unbalance</th>
+            <td>{{ object.unbalanced_current_pct|floatformat:2 }} %</td>
+          </tr>
+          {% endif %}
+          {% if object.unbalanced_ll_current_pct is not None %}
+          <tr>
+            <th scope="row">L-L Current Unbalance</th>
+            <td>{{ object.unbalanced_ll_current_pct|floatformat:2 }} %</td>
+          </tr>
+          {% endif %}
+          {% if object.unbalanced_ll_voltage_pct is not None %}
+          <tr>
+            <th scope="row">L-L Voltage Unbalance</th>
+            <td>{{ object.unbalanced_ll_voltage_pct|floatformat:2 }} %</td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+      {% endif %}
+      {% if linepairs %}
+      <div class="card">
+        <h2 class="card-header">Line Pairs</h2>
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Pair</th>
+              <th>Voltage (V)</th>
+              <th>Current (A)</th>
+              <th>Power (W)</th>
+              <th>Apparent (VA)</th>
+              <th>PF</th>
+              <th>Energy (Wh)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lp in linepairs %}
+            <tr>
+              <td>{{ lp.line_pair }}</td>
+              <td>{% if lp.voltage_v is not None %}{{ lp.voltage_v|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td>{% if lp.current_a is not None %}{{ lp.current_a|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td>{% if lp.power_w is not None %}{{ lp.power_w|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td>{% if lp.apparent_power_va is not None %}{{ lp.apparent_power_va|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td>{% if lp.power_factor is not None %}{{ lp.power_factor|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td>{% if lp.energy_wh is not None %}{{ lp.energy_wh|floatformat:0 }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
       {% if thresholds %}
         <div class="card">
           <h2 class="card-header">Thresholds</h2>
