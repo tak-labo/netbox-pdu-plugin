@@ -141,6 +141,7 @@ class PDUOutletTable(NetBoxTable):
             "actions",
         )
         default_columns = (
+            "pk",
             "managed_pdu",
             "outlet_number",
             "outlet_name",

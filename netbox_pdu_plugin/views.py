@@ -516,6 +516,51 @@ class PDUOutletPowerCycleView(PDUOutletPowerView):
     power_state = "cycle"
 
 
+class PDUOutletBulkPowerView(View):
+    """Bulk power ON/OFF for multiple outlets of a single PDU."""
+
+    def post(self, request, pk):
+        managed_pdu = get_object_or_404(models.ManagedPDU, pk=pk)
+
+        if not request.user.has_perm("netbox_pdu_plugin.change_managedpdu"):
+            messages.error(request, _("You do not have permission to control outlets."))
+            return redirect(managed_pdu.get_absolute_url())
+
+        action = request.POST.get("action")
+        if action not in ("on", "off"):
+            messages.error(request, _("Invalid action."))
+            return redirect(managed_pdu.get_absolute_url())
+
+        outlet_pks = request.POST.getlist("pk")
+        if not outlet_pks:
+            messages.warning(request, _("No outlets selected."))
+            return redirect(managed_pdu.get_absolute_url())
+
+        outlets = models.PDUOutlet.objects.filter(pk__in=outlet_pks, managed_pdu=managed_pdu)
+        client = get_pdu_client(managed_pdu)
+        success, failed = 0, 0
+
+        for outlet in outlets:
+            try:
+                client.set_outlet_power_state(outlet.outlet_number - 1, action)
+                # Optimistic status update — avoids N extra API round-trips.
+                # Use individual outlet sync to verify actual state if needed.
+                outlet.status = OutletStatusChoices.ON if action == "on" else OutletStatusChoices.OFF
+                outlet.last_updated_from_pdu = timezone.now()
+                outlet.save()
+                success += 1
+            except PDUClientError as e:
+                logger.error("Bulk power %s failed for outlet %s: %s", action, outlet, e)
+                failed += 1
+
+        if success:
+            messages.success(request, f"{success} outlet(s) powered {action.upper()}.")
+        if failed:
+            messages.error(request, f"{failed} outlet(s) failed.")
+
+        return redirect(managed_pdu.get_absolute_url())
+
+
 @register_model_view(models.PDUOutlet, name="add", detail=False)
 @register_model_view(models.PDUOutlet, name="edit")
 class PDUOutletEditView(generic.ObjectEditView):

@@ -244,7 +244,56 @@
         <div class="table-responsive">
           {% render_table outlets_table %}
         </div>
+        {% if perms.netbox_pdu_plugin.change_managedpdu %}
+        <div class="card-footer d-flex align-items-center gap-2">
+          <span class="text-muted small me-2" id="outlet-selected-count">0 selected</span>
+          <form id="bulk-power-form" method="post"
+                action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_bulk_power' pk=object.pk %}">
+            {% csrf_token %}
+            <div id="bulk-pk-inputs"></div>
+            <button type="submit" name="action" value="on"  class="btn btn-success btn-sm">Power ON</button>
+            <button type="submit" name="action" value="off" class="btn btn-danger btn-sm">Power OFF</button>
+          </form>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
+  <script>
+  (function () {
+    function getChecked() {
+      return [...document.querySelectorAll('input[name="pk"]:checked')].map(cb => cb.value);
+    }
+    function updateCount() {
+      var n = getChecked().length;
+      var el = document.getElementById('outlet-selected-count');
+      if (el) el.textContent = n === 0 ? '0 selected' : n + ' selected';
+    }
+    document.addEventListener('change', function (e) {
+      if (e.target && e.target.name === 'pk') updateCount();
+    });
+    var bulkForm = document.getElementById('bulk-power-form');
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', function (e) {
+        var pks = getChecked();
+        if (pks.length === 0) {
+          e.preventDefault();
+          alert('Select at least one outlet.');
+          return;
+        }
+        var container = document.getElementById('bulk-pk-inputs');
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        pks.forEach(function (pk) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'pk';
+          input.value = pk;
+          container.appendChild(input);
+        });
+      });
+    }
+  })();
+  </script>
 {% endblock content %}

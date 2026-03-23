@@ -343,3 +343,135 @@ class PDUInletPushNameViewTest(PluginViewTestCase):
 
         pp.refresh_from_db()
         self.assertEqual(pp.label, "old label")
+
+
+class PDUOutletBulkPowerViewTest(PluginViewTestCase):
+    """Tests for PDUOutletBulkPowerView (bulk ON/OFF)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pdu = create_test_pdu()
+        cls.pdu2_device = create_test_device("PDU-BULK-2")
+        cls.pdu2 = create_test_pdu(cls.pdu2_device)
+        cls.outlet1 = PDUOutlet.objects.create(
+            managed_pdu=cls.pdu,
+            outlet_number=1,
+            outlet_name="Outlet 1",
+        )
+        cls.outlet2 = PDUOutlet.objects.create(
+            managed_pdu=cls.pdu,
+            outlet_number=2,
+            outlet_name="Outlet 2",
+        )
+        cls.outlet_other_pdu = PDUOutlet.objects.create(
+            managed_pdu=cls.pdu2,
+            outlet_number=1,
+            outlet_name="Other PDU Outlet",
+        )
+
+    def _url(self):
+        return reverse(
+            "plugins:netbox_pdu_plugin:pduoutlet_bulk_power",
+            kwargs={"pk": self.pdu.pk},
+        )
+
+    def test_bulk_power_without_permission_redirects(self):
+        response = self.client.post(self._url(), {"action": "on", "pk": [self.outlet1.pk]})
+        self.assertHttpStatus(response, 302)
+
+    def test_bulk_power_without_permission_does_not_call_backend(self):
+        with patch("netbox_pdu_plugin.views.get_pdu_client") as mock_get_client:
+            self.client.post(self._url(), {"action": "on", "pk": [self.outlet1.pk]})
+            mock_get_client.assert_not_called()
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_on(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(
+            self._url(), {"action": "on", "pk": [self.outlet1.pk, self.outlet2.pk]}
+        )
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_any_call(0, "on")
+        mock_client.set_outlet_power_state.assert_any_call(1, "on")
+        self.assertEqual(mock_client.set_outlet_power_state.call_count, 2)
+        self.outlet1.refresh_from_db()
+        self.outlet2.refresh_from_db()
+        self.assertEqual(self.outlet1.status, OutletStatusChoices.ON)
+        self.assertEqual(self.outlet2.status, OutletStatusChoices.ON)
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_off(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(
+            self._url(), {"action": "off", "pk": [self.outlet1.pk, self.outlet2.pk]}
+        )
+
+        self.assertHttpStatus(response, 302)
+        self.outlet1.refresh_from_db()
+        self.outlet2.refresh_from_db()
+        self.assertEqual(self.outlet1.status, OutletStatusChoices.OFF)
+        self.assertEqual(self.outlet2.status, OutletStatusChoices.OFF)
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_no_pks_returns_warning(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(self._url(), {"action": "on"})
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_not_called()
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_invalid_action_returns_error(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(
+            self._url(), {"action": "cycle", "pk": [self.outlet1.pk]}
+        )
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_not_called()
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_ignores_outlets_from_other_pdu(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        response = self.client.post(
+            self._url(),
+            {"action": "on", "pk": [self.outlet1.pk, self.outlet_other_pdu.pk]},
+        )
+
+        self.assertHttpStatus(response, 302)
+        mock_client.set_outlet_power_state.assert_called_once_with(0, "on")
+
+    @patch("netbox_pdu_plugin.views.get_pdu_client")
+    def test_bulk_power_continues_after_api_error(self, mock_get_client):
+        self.add_permissions("netbox_pdu_plugin.change_managedpdu")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.set_outlet_power_state.side_effect = [
+            PDUClientError("timeout"),
+            None,
+        ]
+
+        response = self.client.post(
+            self._url(), {"action": "on", "pk": [self.outlet1.pk, self.outlet2.pk]}
+        )
+
+        self.assertHttpStatus(response, 302)
+        self.assertEqual(mock_client.set_outlet_power_state.call_count, 2)
+        self.outlet2.refresh_from_db()
+        self.assertEqual(self.outlet2.status, OutletStatusChoices.ON)
