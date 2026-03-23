@@ -118,6 +118,7 @@ class PDUOutletTable(NetBoxTable):
     status = ChoiceFieldColumn()
     current_a = tables.Column(verbose_name="Current (A)")
     power_w = tables.Column(verbose_name="Power (W)")
+    apparent_power_va = tables.Column(verbose_name="Apparent Power (VA)")
     voltage_v = tables.Column(verbose_name="Voltage (V)")
     power_factor = tables.Column(verbose_name="Power Factor")
     last_updated_from_pdu = tables.DateTimeColumn(verbose_name="Last Updated")
@@ -129,6 +130,9 @@ class PDUOutletTable(NetBoxTable):
         return _fmt2(value)
 
     def render_power_w(self, value):
+        return _fmt2(value)
+
+    def render_apparent_power_va(self, value):
         return _fmt2(value)
 
     def render_voltage_v(self, value):
@@ -149,6 +153,7 @@ class PDUOutletTable(NetBoxTable):
             "status",
             "current_a",
             "power_w",
+            "apparent_power_va",
             "voltage_v",
             "power_factor",
             "last_updated_from_pdu",
@@ -163,6 +168,7 @@ class PDUOutletTable(NetBoxTable):
             "status",
             "current_a",
             "power_w",
+            "apparent_power_va",
             "voltage_v",
             "power_factor",
             "last_updated_from_pdu",

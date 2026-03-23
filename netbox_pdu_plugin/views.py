@@ -274,6 +274,7 @@ class ManagedPDUGetMetricsView(View):
                     update_fields = {
                         "current_a": outlet_data.get("current_a"),
                         "power_w": outlet_data.get("power_w"),
+                        "apparent_power_va": outlet_data.get("apparent_power_va"),
                         "voltage_v": outlet_data.get("voltage_v"),
                         "power_factor": outlet_data.get("power_factor"),
                         "energy_wh": outlet_data.get("energy_wh"),

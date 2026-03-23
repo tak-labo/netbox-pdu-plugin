@@ -217,6 +217,7 @@ class RaritanPDUClient(BasePDUClient):
                     "name": d.get("name", ""),
                     "current_a": d.get("current_a"),
                     "power_w": d.get("power_w"),
+                    "apparent_power_va": d.get("apparent_power_va"),
                     "voltage_v": d.get("voltage_v"),
                     "power_factor": d.get("power_factor"),
                     "energy_wh": d.get("energy_wh"),
