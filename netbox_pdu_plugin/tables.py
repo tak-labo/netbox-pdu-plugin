@@ -18,6 +18,7 @@ class ManagedPDUTable(NetBoxTable):
         verbose_name="Managed PDU",
     )
     device = tables.Column(linkify=True)
+    pdu_name = tables.Column(accessor="device.name", verbose_name="Name", orderable=False)
     api_url = tables.Column(verbose_name="API URL")
     sync_status = ChoiceFieldColumn(verbose_name="Sync Status")
     last_synced = tables.DateTimeColumn(verbose_name="Last Synced")
@@ -33,6 +34,7 @@ class ManagedPDUTable(NetBoxTable):
             "id",
             "name",
             "device",
+            "pdu_name",
             "api_url",
             "pdu_model",
             "serial_number",
