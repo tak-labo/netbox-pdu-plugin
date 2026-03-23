@@ -161,9 +161,9 @@
             <th scope="row">Phase Type</th>
             <td>
               {% if object.phase_type == "three" %}
-                <span class="badge bg-info text-dark">三相 (Three-Phase)</span>
+                三相 (Three-Phase)
               {% elif object.phase_type == "single" %}
-                <span class="badge bg-dark">単相 (Single-Phase)</span>
+                単相 (Single-Phase)
               {% else %}
                 {{ ""|placeholder }}
               {% endif %}
