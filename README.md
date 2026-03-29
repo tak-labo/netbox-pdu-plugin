@@ -1,9 +1,10 @@
 # NetBox PDU Plugin
 
-A [NetBox](https://github.com/netbox-community/netbox) plugin for Managed PDUs. Links PDU devices to NetBox Device records and provides outlet/inlet monitoring and power control via vendor APIs.
+NetBox plugin for PDU management.
 
 ![NetBox](https://img.shields.io/badge/NetBox-4.5-blue)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-blue)
+![PyPI](https://img.shields.io/pypi/v/netbox-pdu-plugin)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green)
 
 > **[日本語版は下にあります / Japanese version below](#netbox-pdu-プラグイン)**
